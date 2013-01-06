@@ -6,6 +6,7 @@ document.body.appendChild(canvas);
 var used = false;
 var longused = false;
 var gridArray = new Array();
+var charArray = new Array();
 var tileArray = new Array(
 	"w","w","w","w","w","w","w","w","w","w","w","w","w","w","w","w",
 	"w","w","w","w","w","w","w","w","w","w","w","w","w","w","w","w",
@@ -24,10 +25,15 @@ var tileArray = new Array(
 	"f","f","f","f","f","f","f","p","p","p","p","p","p","p","p","p",
 	"f","f","f","f","f","f","f","p","p","p","p","p","p","p","p","p"
 );
+var atLog = {
+	hp: 0,
+	max: 0
+};
 var curGrid;
 var prevGrid;
 var setX = 0;
 var setY = 0;
+alert("Use the WASD keys to move. Z selects a character, X attacks an adjacent character.");
 // ------------------------------------
 var bgReady = false;
 var bgImage = new Image();
@@ -36,19 +42,26 @@ bgImage.onload = function () {
 };
 bgImage.src = "images/Map1.png";
 
-var uReady = false;
-var uImage = new Image();
-uImage.onload = function () {
-	uReady = true;
+var g1Ready = false;
+var g1Image = new Image();
+g1Image.onload = function () {
+	g1Ready = true;
 };
-uImage.src = "images/Char1/Char1Front.png";
+g1Image.src = "images/Char1/Char1Front.png";
 
-var mReady = false;
-var mImage = new Image();
-mImage.onload = function () {
-	mReady = true;
+var b1Ready = false;
+var b1Image = new Image();
+b1Image.onload = function () {
+	b1Ready = true;
 };
-mImage.src = "images/Fighter1.png";
+b1Image.src = "images/Enemy1/Enemy1Front.png";
+
+var b2Ready = false;
+var b2Image = new Image();
+b2Image.onload = function () {
+	b2Ready = true;
+};
+b2Image.src = "images/Enemy1/Enemy1Front.png";
 
 var curReady = false;
 var curImage = new Image();
@@ -61,24 +74,41 @@ var cur = {
 	x: 256,
 	y: 256
 };
-var u = {
+var good1 = {
 	x: 256,
-	y: 256
+	y: 256,
+	max: 5,
+	hp: 5,
+	attack: 2,
+	team: "good"
 };
-var m = {
+charArray.push(good1);
+var bad1 = {
 	x: 160,
-	y: 160
+	y: 160,
+	max: 4,
+	hp: 4,
+	attack: 1,
+	team: "bad"
 };
-var selected = cur;
+charArray.push(bad1);
+var bad2 = {
+	x: 192,
+	y: 192,
+	max: 4,
+	hp: 4,
+	attack: 1,
+	team: "bad"
+};
+charArray.push(bad2);
+var selected = {
+	dir: "Front",
+	s: cur
+};
+selected.s = cur;
 var keysDown = {};
-var event1 = {
-	x: 256,
-	y: 256
-};
-
 checkx = selected.x;
 checky = selected.y;
-var charArray = new Array(u,m);
 // ------------------------------------
 addEventListener("keydown", function (e) {
 	keysDown[e.keyCode] = true;
@@ -90,68 +120,96 @@ addEventListener("keyup", function (e) {
 // ------------------------------------
 var update = function (modifier) {
 	if (65 in keysDown && !used) { // Left A
-		if (selected != cur) {
-			if (gridArray[(curGrid - 1)].t != "w") {
-				selected.x -= 32;
+		if (selected.s != cur) {
+			selected.dir = "Left";
+			if (
+				gridArray[(curGrid - 1)].t != "w" 
+				&& !overlap(selected.s.x,selected.s.y,selected.dir)
+				) {
+				selected.s.x -= 32;
+				cur.x -= 32;
 			}
-		}else if (selected == cur) {
-			selected.x -= 32;
+		}else if (selected.s == cur) {
+			selected.s.x -= 32;
 		}
 	}
 	if (68 in keysDown && !used) { // Right D 
-		if (selected != cur) {
-			if (gridArray[(curGrid + 1)].t != "w") {
-				selected.x += 32;
+		if (selected.s != cur) {
+			selected.dir = "Right";
+			if (
+				gridArray[(curGrid + 1)].t != "w"
+				&& !overlap(selected.s.x,selected.s.y,selected.dir)
+				) {
+				selected.s.x += 32;
+				cur.x += 32;
 			}
-		}else if (selected == cur) {
-			selected.x += 32;
+		}else if (selected.s == cur) {
+			selected.s.x += 32;
 		}
 	}
 	if (87 in keysDown && !used) { // Up W 
-		if (selected != cur) {	
-			if (gridArray[(curGrid - 16)].t != "w") {
-				selected.y -= 32;
+		if (selected.s != cur) {	
+			selected.dir = "Back";
+			if (
+				gridArray[(curGrid - 16)].t != "w"
+				&& !overlap(selected.s.x,selected.s.y,selected.dir)
+				) {
+				selected.s.y -= 32;
+				cur.y -= 32;
 			}
-		}else if (selected == cur) {
-			selected.y -= 32;
+		}else if (selected.s == cur) {
+			selected.s.y -= 32;
 		}
 	}
 	if (83 in keysDown && !used) { // Down S 
-		if (selected != cur) {
-			if (gridArray[(curGrid + 16)].t != "w") {
-				selected.y += 32;
+		if (selected.s != cur) {
+			selected.dir = "Front";
+			if (
+				gridArray[(curGrid + 16)].t != "w"
+				&& !overlap(selected.s.x,selected.s.y,selected.dir)
+				) {
+				selected.s.y += 32;
+				cur.y += 32;
 			}
-		}else if (selected == cur) {
-			selected.y += 32;
+		}else if (selected.s == cur) {
+			selected.s.y += 32;
 		}
 	}
 	
-	if (!longused) {
+	if (!longused && selected.s != cur) {
 		for (var i=0; i<charArray.length;i++) {
 			if (
-				((charArray[i].x - selected.x == 32) && (charArray[i].y - selected.y == 0))
-				||((charArray[i].y - selected.y == 32) && (charArray[i].x - selected.x == 0))
-				||((charArray[i].x - selected.x == -32) && (charArray[i].y - selected.y == 0))
-				||((charArray[i].y - selected.y == -32) && (charArray[i].x -  selected.x == 0))
+				((charArray[i].x - selected.s.x == 32) && (charArray[i].y - selected.s.y == 0))
+				||((charArray[i].y - selected.s.y == 32) && (charArray[i].x - selected.s.x == 0))
+				||((charArray[i].x - selected.s.x == -32) && (charArray[i].y - selected.s.y == 0))
+				||((charArray[i].y - selected.s.y == -32) && (charArray[i].x -  selected.s.x == 0))
 				) {
-					if (88 in keysDown && !longused) { // A
-						selected.x = charArray[i].x;
-						selected.y = charArray[i].y;
+					if (88 in keysDown && !longused) { // X
+						charArray[i].hp -= selected.s.attack;
+						atLog.hp = charArray[i].hp;
+						atLog.max = charArray[i].max;
 						longused = true;
+						if (charArray[i].hp <= 0) {
+							charArray[i].x = 699;
+							charArray[i].y = 699;
+						}
 					}
 				}
 		}
 	}
 	
 	if (90 in keysDown && !used) { // Z
-		if (selected != cur) {
-			selected = cur;
+		if (selected.s != cur) {
+			selected.s = cur;
 			used = true;
-		}
-		for (var i=0; i<charArray.length;i++) {
-			if (cur.y == charArray[i].y && cur.x == charArray[i].x && selected == cur) {
-				selected = charArray[i];
-				used = true;
+		}else if (selected.s == cur) {
+			for (var i=0; i<charArray.length;i++) {
+				if (cur.y == charArray[i].y && cur.x == charArray[i].x && selected.s == cur) {
+					if (charArray[i].team != "bad") {
+						selected.s = charArray[i];
+						used = true;
+					}
+				}
 			}
 		}
 	}
@@ -162,50 +220,68 @@ var render = function () {
 		ctx.drawImage(bgImage, 0, 0);
 	}
 	
-	if (uReady) {
-		ctx.drawImage(uImage, u.x, u.y);
+	if (g1Ready) {
+		if (selected.s == good1) {
+			g1Image.src = (("images/Char1/Char1" + selected.dir) + (".png"))
+		}
+		ctx.drawImage(g1Image, good1.x, good1.y);
 	}
 	
-	if (mReady) {
-		ctx.drawImage(mImage, m.x, m.y);
+	if (b1Ready) {
+		if (selected.s == bad1) {
+			b1Image.src = (("images/Enemy1/Enemy1" + selected.dir) + (".png"))
+		}
+		ctx.drawImage(b1Image, bad1.x, bad1.y);
+	}
+	
+	if (b2Ready) {
+		if (selected.s == bad2) {
+			b2Image.src = (("images/Enemy1/Enemy1" + selected.dir) + (".png"))
+		}
+		ctx.drawImage(b2Image, bad2.x, bad2.y);
 	}
 	
 	if (curReady) {
 		ctx.drawImage(curImage, cur.x,cur.y);
 	}
 	
-	if (checkx != selected.x || checky != selected.y) {
+	if (checkx != selected.s.x || checky != selected.s.y) {
 		used = true;
 	}
 	
 	for (var i = 0; i < gridArray.length; i++) {
-		if (selected.x == gridArray[i].x && selected.y == gridArray[i].y) {
+		if (selected.s.x == gridArray[i].x && selected.s.y == gridArray[i].y) {
 			curGrid = gridArray[i].g
 		}
 	}
 	
 	if (curGrid == gridArray[100].g) {
-		alert("You've touched grid 100, congratulations! FUCK YOU");
-		location.reload();
+		
 	}
 	
-	if (selected.x > 480) {
-		selected.x -= 32;
-	}else if (selected.x < 0) {
-		selected.x += 32;
-	}else if (selected.y > 480) {
-		selected.y -= 32;
-	}else if (selected.y < 0) {
-		selected.y += 32;
+	if (selected.s.x > 480) {
+		selected.s.x -= 32;
+	}else if (selected.s.x < 0) {
+		selected.s.x += 32;
+	}else if (selected.s.y > 480) {
+		selected.s.y -= 32;
+	}else if (selected.s.y < 0) {
+		selected.s.y += 32;
 	}
 	
 	ctx.fillStyle = "rgb(250, 250, 250)";
 	ctx.font = "12px arial";
 	ctx.textAlign = "left";
 	ctx.textBaseline = "top";
-	ctx.fillText(("Position: "+ selected.x)+(", "+ selected.y)+(", " + curGrid), 5, 5);
-	checkx = selected.x;
-	checky = selected.y;
+	ctx.fillText(("X,Y,Grid: "+ selected.s.x)+(", "+ selected.s.y)+(", " + curGrid), 5, 5);
+	
+	ctx.fillstyle = "rgb(250, 250, 250)";
+	ctx.font = "12px arial";
+	ctx.textAlign = "left";
+	ctx.textBaseline = "top";
+	ctx.fillText(("HP: " + atLog.hp) + ("/ " + atLog.max) , 420, 5);
+	checkx = selected.s.x;
+	checky = selected.s.y;
 };
 // ------------------------------------
 var main = function () {
@@ -218,6 +294,28 @@ var main = function () {
 	then = now;
 };
 var then = Date.now();
+
+var overlap = function (x,y,z) {
+	for (var i=0;i<charArray.length;i++) {
+		if (z == "Left") {
+			if((charArray[i].x - x == -32) && (charArray[i].y - y == 0)) {
+				return true;
+			}
+		}else if (z == "Front") {
+			if((charArray[i].y - y == 32) && (charArray[i].x - x == 0)) {
+				return true;
+			}
+		}else if (z == "Right") {
+			if ((charArray[i].x - x == 32) && (charArray[i].y - y == 0)) { 
+				return true;
+			}
+		}else if (z == "Back") {
+			if((charArray[i].y - y == -32) && (charArray[i].x -  x == 0)) {
+				return true;
+			}
+		}
+	}
+};
 // ------------------------------------
 for (var i=0;i<256;i++) {
 	gridArray[i] = {
@@ -233,6 +331,6 @@ for (var i=0;i<256;i++) {
 		setY += 32;
 	}
 };
-setInterval(function(){used=false;}, 400);
+setInterval(function(){used=false;}, 333);
 setInterval(function(){longused=false;},2000);
 setInterval(main,11);
